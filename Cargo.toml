@@ -1,0 +1,11 @@
+[package]
+name = "rust-hackathon"
+version = "0.1.0"
+authors = ["Jannik Keye <jannik.keye@gmail.com>"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+rand = "0.5.3"
