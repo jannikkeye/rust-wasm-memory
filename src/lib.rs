@@ -13,6 +13,9 @@ extern {
 
 #[wasm_bindgen]
 extern {
+    #[wasm_bindgen(js_name = setTimeout)]
+    fn set_timeout(cb: &Closure<FnMut()>, delay: u32) -> f64;
+
     type HTMLDocument;
     static document: HTMLDocument;
     #[wasm_bindgen(method, getter)]
@@ -22,15 +25,17 @@ extern {
     #[wasm_bindgen(method, js_name = getElementById)]
     fn get_element_by_id(this: &HTMLDocument, id: &str) -> HTMLElement;
 
-    type HTMLElement;
+    pub type HTMLElement;
     #[wasm_bindgen(method, setter = id)]
     fn set_id(this: &HTMLElement, id: &str);
     #[wasm_bindgen(method, setter = className)]
     fn set_class(this: &HTMLElement, class: &str);
+    #[wasm_bindgen(method, setter = style)]
+    fn set_style(this: &HTMLElement, style: &str);
     #[wasm_bindgen(method, setter = innerHTML)]
     fn set_inner_html(this: &HTMLElement, html: &str);
     #[wasm_bindgen(method, js_name = appendChild)]
-    fn append_child(this: &HTMLElement, other: HTMLElement);
+    fn append_child(this: &HTMLElement, other: &HTMLElement);
     #[wasm_bindgen(method, setter)]
     fn set_onclick(this: &HTMLElement, cb: &Closure<FnMut()>);
 }
@@ -48,6 +53,12 @@ pub enum CardState {
     Matched
 }
 
+pub enum MemoryState {
+    AllClosed,
+    OneRevealed,
+    TwoRevealed
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Card {
     pub id: usize,
@@ -60,7 +71,8 @@ pub struct Memory {
     cards: Vec<Card>,
     width: u32,
     height: u32,
-    score: u8
+    score: u8,
+    container: HTMLElement
 }
 
 impl Card {
@@ -99,7 +111,7 @@ impl Card {
 
 #[wasm_bindgen]
 impl Memory {
-    pub fn new() -> Memory {
+    pub fn new(container: &str) -> Memory {
         let mut cards = Vec::new();
         let chars: Vec<char> = get_shuffled_cards().chars().collect();
 
@@ -111,19 +123,37 @@ impl Memory {
             cards,
             width: 6,
             height: 4,
-            score: 0
+            score: 0,
+            container: document.get_element_by_id(container)
         }
     }
 
-    pub fn start(&mut self) {
-        let container = document.createElement("div");
+    pub fn init(&self) {
+        let container = document.get_element_by_id("memory-canvas");
+        self.render_title(&container);
+        self.render_cards(&container);
+        self.render_button(&container);
 
-        container.set_id("memory");
+        log("Appended card elements to the DOM.")
+    }
 
-        document.body().append_child(container);
+    pub fn render_title(&self, target: &HTMLElement) {
+        let title = document.createElement("div");
+        let score_display = document.createElement("div");
 
-        for card in self.cards.as_mut_slice().iter_mut() {
-            let container = document.get_element_by_id("memory");
+        title.set_id("memory-title");
+        score_display.set_id("memory-score");
+        title.set_inner_html("Rust WASM Memory");
+        score_display.set_inner_html(&fmt::format(format_args!("Score: {}", &self.score)));
+        title.append_child(&score_display);
+        target.append_child(&title);
+    }
+
+    pub fn render_cards(&self, target: &HTMLElement) {
+        let cards = document.createElement("div");
+        cards.set_id("memory-cards");
+
+        for card in self.cards.as_slice().iter() {
             let card_element = document.createElement("div");
             card_element.set_class("card");
             card_element.set_id(&card.id.to_string());
@@ -135,13 +165,21 @@ impl Memory {
             };
             card_element.set_inner_html(&card_value);
 
-            container.append_child(card_element);
+            cards.append_child(&card_element);
         };
 
-        log("Appended card elements to the DOM.")
+        target.append_child(&cards);
     }
 
-    pub fn update(&self) {
+    pub fn render_button(&self, target: &HTMLElement) {
+        let button = document.createElement("button");
+        button.set_id("memory-button");
+        button.set_style("pointer-events: none;");
+
+        target.append_child(&button);
+    }
+
+    pub fn update_cards(&self) {
         for (index, card) in self.cards.iter().enumerate() {
             let card_element = document.get_element_by_id(&index.to_string());
 
@@ -155,38 +193,90 @@ impl Memory {
         }
     }
 
+    pub fn update_score(&self) {
+        let score_display = document.get_element_by_id("memory-score");
+        score_display.set_inner_html(&fmt::format(format_args!("Score: {}", &self.score)));
+    }
+
+    pub fn update(&self) {
+        self.update_cards();
+        self.update_score();
+    }
+
     pub fn render(&self) -> String {
         self.to_string()
     }
 
     pub fn close_cards(&mut self) {
-        self.cards.iter_mut().for_each(|card| {
-            card.set_closed();
-        });
+        self.cards.iter_mut()
+            .filter(|card| {
+                !card.is_matched()
+            })
+            .for_each(|card| {
+                card.set_closed();
+            });
+
+        self.set_card_style("");
+        self.set_button_style("pointer-events: none;");
+
+        self.update();
     }
 
     pub fn reveal_card(&mut self, card_index: usize) {
         {
             let card: &mut Card = self.cards.iter_mut().nth(card_index).unwrap();
 
-            card.set_revealed();
+            if card.is_closed() {
+                card.set_revealed();
+            }
         }
 
         self.update();
 
         self.handle_match();
+    }
 
-        self.update();
+    pub fn set_card_style(&self, style: &str) {
+        for (index, card) in self.cards.iter().enumerate() {
+            let card_element = document.get_element_by_id(&index.to_string());
+
+            card_element.set_style(style);
+        }
+    }
+
+    pub fn set_button_style(&self, style: &str) {
+        let button = document.get_element_by_id("memory-button");
+
+        button.set_style(style);
     }
 
     pub fn check_match(&mut self) -> bool {
-        true
+        let revealed_cards: Vec<&Card> = self.cards
+            .iter()
+            .filter(|card| { card.is_revealed() })
+            .collect();
+
+        revealed_cards[0].value == revealed_cards[1].value
     }
 
     pub fn handle_match(&mut self) {
+        {
+            let revealed_cards = self.cards
+                .iter()
+                .filter(|card| { card.is_revealed() })
+                .count();
+
+            if revealed_cards != 2 {
+                return
+            }
+        }
+
         match self.check_match() {
             true => self.increase_score(),
-            false => unimplemented!()
+            false => {
+                self.set_card_style("pointer-events: none;");
+                self.set_button_style("");
+            }
         };
     }
 
@@ -198,6 +288,10 @@ impl Memory {
             .iter_mut()
             .filter(|card| { card.is_revealed() })
             .for_each(|card| { card.set_matched() });
+
+        if self.score == 12 {
+            self.set_card_style("pointer-events: none;")
+        }
 
     }
 

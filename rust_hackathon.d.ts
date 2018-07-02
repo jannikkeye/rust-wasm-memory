@@ -1,9 +1,19 @@
 /* tslint:disable */
 export class Memory {
 free(): void;
-static  new(): Memory;
+static  new(arg0: string): Memory;
 
- start(): void;
+ init(): void;
+
+ render_title(arg0: any): void;
+
+ render_cards(arg0: any): void;
+
+ render_button(arg0: any): void;
+
+ update_cards(): void;
+
+ update_score(): void;
 
  update(): void;
 
@@ -12,6 +22,10 @@ static  new(): Memory;
  close_cards(): void;
 
  reveal_card(arg0: number): void;
+
+ set_card_style(arg0: string): void;
+
+ set_button_style(arg0: string): void;
 
  check_match(): boolean;
 

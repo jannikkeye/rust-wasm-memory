@@ -50,6 +50,14 @@ export function get_shuffled_cards() {
 
 export function attach_event_listeners(memory) {
   const cardElements = document.getElementsByClassName("card");
+  const button = document.getElementById("memory-button");
+
+  function close_cards(memory) {
+    memory.close_cards();
+  }
+  button.addEventListener("click", (e) => {
+    close_cards(memory);
+  })
 
   Array.from(cardElements).forEach((e, i) => {
     function click() {
@@ -60,10 +68,11 @@ export function attach_event_listeners(memory) {
   })
 }
 
+
 js.then(js => {
   const memory = js.Memory.new();
   const pre = document.getElementById("memory-canvas");
-
-  memory.start();
+  
+  memory.init("memory-canvas");
   attach_event_listeners(memory);
 });

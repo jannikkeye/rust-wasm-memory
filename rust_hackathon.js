@@ -40,6 +40,18 @@ export function __wbg_f_get_shuffled_cards_get_shuffled_cards_n(ret) {
 
 }
 
+let cachedGlobalArgumentPtr = null;
+function globalArgumentPtr() {
+    if (cachedGlobalArgumentPtr === null)
+        cachedGlobalArgumentPtr = wasm.__wbindgen_global_argument_ptr();
+    return cachedGlobalArgumentPtr;
+}
+
+function getGlobalArgument(arg) {
+    const idx = globalArgumentPtr() / 4 + arg;
+    return getUint32Memory()[idx];
+}
+
 let slab = [];
 
 let slab_next = 0;
@@ -56,6 +68,41 @@ function addHeapObject(obj) {
     return idx << 1;
 }
 
+let stack = [];
+
+function getObject(idx) {
+    if ((idx & 1) === 1) {
+        return stack[idx >> 1];
+    } else {
+        const val = slab[idx >> 1];
+
+    return val.obj;
+
+    }
+}
+
+export function __wbg_f_setTimeout_set_timeout_n(arg0, arg1) {
+    let idxarg0 = getUint32Memory()[arg0 / 4];
+    if (idxarg0 === 0xffffffff) {
+        let cbarg0 = function() {
+            let a = this.a;
+            this.a = 0;
+            try {
+                return this.f(a, this.b);
+            } finally {
+                this.a = a;
+            }
+        };
+        cbarg0.a = getGlobalArgument(0);
+        cbarg0.b = getGlobalArgument(1);
+        cbarg0.f = wasm.__wbg_function_table.get(getGlobalArgument(2));
+        let real = cbarg0.bind(cbarg0);
+        real.original = cbarg0;
+        idxarg0 = getUint32Memory()[arg0 / 4] = addHeapObject(real);
+    }
+    return setTimeout(getObject(idxarg0), arg1);
+}
+
 export function __wbg_static_accessor_document_document() {
     return addHeapObject(document);
 }
@@ -70,19 +117,6 @@ function GetOwnOrInheritedPropertyDescriptor(obj, id) {
 }
 
 const __wbg_f_body_body_HTMLDocument_target = GetOwnOrInheritedPropertyDescriptor(HTMLDocument.prototype, 'body').get;;
-
-let stack = [];
-
-function getObject(idx) {
-    if ((idx & 1) === 1) {
-        return stack[idx >> 1];
-    } else {
-        const val = slab[idx >> 1];
-
-    return val.obj;
-
-    }
-}
 
 export function __wbg_f_body_body_HTMLDocument(arg0) {
     return addHeapObject(__wbg_f_body_body_HTMLDocument_target.call(getObject(arg0)));
@@ -126,6 +160,13 @@ export function __wbg_f_set_class_set_class_HTMLElement(arg0, arg1, arg2) {
     __wbg_f_set_class_set_class_HTMLElement_target.call(getObject(arg0), varg1);
 }
 
+const __wbg_f_set_style_set_style_HTMLElement_target = GetOwnOrInheritedPropertyDescriptor(HTMLElement.prototype, 'style').set;;
+
+export function __wbg_f_set_style_set_style_HTMLElement(arg0, arg1, arg2) {
+    let varg1 = getStringFromWasm(arg1, arg2);
+    __wbg_f_set_style_set_style_HTMLElement_target.call(getObject(arg0), varg1);
+}
+
 const __wbg_f_set_inner_html_set_inner_html_HTMLElement_target = GetOwnOrInheritedPropertyDescriptor(HTMLElement.prototype, 'innerHTML').set;;
 
 export function __wbg_f_set_inner_html_set_inner_html_HTMLElement(arg0, arg1, arg2) {
@@ -135,42 +176,11 @@ export function __wbg_f_set_inner_html_set_inner_html_HTMLElement(arg0, arg1, ar
 
 const __wbg_f_appendChild_append_child_HTMLElement_target = HTMLElement.prototype.appendChild;
 
-function dropRef(idx) {
-
-    let obj = slab[idx >> 1];
-
-    obj.cnt -= 1;
-    if (obj.cnt > 0)
-        return;
-
-    // If we hit 0 then free up our space in the slab
-    slab[idx >> 1] = slab_next;
-    slab_next = idx >> 1;
-}
-
-function takeObject(idx) {
-    const ret = getObject(idx);
-    dropRef(idx);
-    return ret;
-}
-
 export function __wbg_f_appendChild_append_child_HTMLElement(arg0, arg1) {
-    __wbg_f_appendChild_append_child_HTMLElement_target.call(getObject(arg0), takeObject(arg1));
+    __wbg_f_appendChild_append_child_HTMLElement_target.call(getObject(arg0), getObject(arg1));
 }
 
 const __wbg_f_set_onclick_set_onclick_HTMLElement_target = GetOwnOrInheritedPropertyDescriptor(HTMLElement.prototype, 'onclick').set;;
-
-let cachedGlobalArgumentPtr = null;
-function globalArgumentPtr() {
-    if (cachedGlobalArgumentPtr === null)
-        cachedGlobalArgumentPtr = wasm.__wbindgen_global_argument_ptr();
-    return cachedGlobalArgumentPtr;
-}
-
-function getGlobalArgument(arg) {
-    const idx = globalArgumentPtr() / 4 + arg;
-    return getUint32Memory()[idx];
-}
 
 export function __wbg_f_set_onclick_set_onclick_HTMLElement(arg0, arg1) {
     let idxarg1 = getUint32Memory()[arg1 / 4];
@@ -201,6 +211,11 @@ export function __wbg_f_log_log_n(arg0, arg1) {
     __wbg_f_log_log_n_target(varg0);
 }
 
+function addBorrowedObject(obj) {
+    stack.push(obj);
+    return ((stack.length - 1) << 1) | 1;
+}
+
 export class Memory {
 
                 static __construct(ptr) {
@@ -216,11 +231,43 @@ export class Memory {
                 this.ptr = 0;
                 wasm.__wbg_memory_free(ptr);
             }
-        static new() {
-    return Memory.__construct(wasm.memory_new());
+        static new(arg0) {
+    const [ptr0, len0] = passStringToWasm(arg0);
+    try {
+        return Memory.__construct(wasm.memory_new(ptr0, len0));
+    } finally {
+        wasm.__wbindgen_free(ptr0, len0 * 1);
+    }
 }
-start() {
-    return wasm.memory_start(this.ptr);
+init() {
+    return wasm.memory_init(this.ptr);
+}
+render_title(arg0) {
+    try {
+        return wasm.memory_render_title(this.ptr, addBorrowedObject(arg0));
+    } finally {
+        stack.pop();
+    }
+}
+render_cards(arg0) {
+    try {
+        return wasm.memory_render_cards(this.ptr, addBorrowedObject(arg0));
+    } finally {
+        stack.pop();
+    }
+}
+render_button(arg0) {
+    try {
+        return wasm.memory_render_button(this.ptr, addBorrowedObject(arg0));
+    } finally {
+        stack.pop();
+    }
+}
+update_cards() {
+    return wasm.memory_update_cards(this.ptr);
+}
+update_score() {
+    return wasm.memory_update_score(this.ptr);
 }
 update() {
     return wasm.memory_update(this.ptr);
@@ -240,6 +287,22 @@ close_cards() {
 }
 reveal_card(arg0) {
     return wasm.memory_reveal_card(this.ptr, arg0);
+}
+set_card_style(arg0) {
+    const [ptr0, len0] = passStringToWasm(arg0);
+    try {
+        return wasm.memory_set_card_style(this.ptr, ptr0, len0);
+    } finally {
+        wasm.__wbindgen_free(ptr0, len0 * 1);
+    }
+}
+set_button_style(arg0) {
+    const [ptr0, len0] = passStringToWasm(arg0);
+    try {
+        return wasm.memory_set_button_style(this.ptr, ptr0, len0);
+    } finally {
+        wasm.__wbindgen_free(ptr0, len0 * 1);
+    }
 }
 check_match() {
     return (wasm.memory_check_match(this.ptr)) !== 0;
@@ -270,6 +333,19 @@ export function __wbindgen_object_clone_ref(idx) {
     const val = slab[idx >> 1];
     val.cnt += 1;
     return idx;
+}
+
+function dropRef(idx) {
+
+    let obj = slab[idx >> 1];
+
+    obj.cnt -= 1;
+    if (obj.cnt > 0)
+        return;
+
+    // If we hit 0 then free up our space in the slab
+    slab[idx >> 1] = slab_next;
+    slab_next = idx >> 1;
 }
 
 export function __wbindgen_object_drop_ref(i) { dropRef(i); }
