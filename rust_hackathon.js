@@ -222,6 +222,9 @@ export class Memory {
 start() {
     return wasm.memory_start(this.ptr);
 }
+update() {
+    return wasm.memory_update(this.ptr);
+}
 render() {
     const retptr = globalArgumentPtr();
     wasm.memory_render(retptr, this.ptr);
@@ -231,6 +234,29 @@ render() {
     const realRet = getStringFromWasm(ptr, len).slice();
     wasm.__wbindgen_free(ptr, len * 1);
     return realRet;
+}
+close_cards() {
+    return wasm.memory_close_cards(this.ptr);
+}
+reveal_card(arg0) {
+    return wasm.memory_reveal_card(this.ptr, arg0);
+}
+check_match() {
+    return (wasm.memory_check_match(this.ptr)) !== 0;
+}
+handle_match() {
+    return wasm.memory_handle_match(this.ptr);
+}
+increase_score() {
+    return wasm.memory_increase_score(this.ptr);
+}
+log(arg0) {
+    const [ptr0, len0] = passStringToWasm(arg0);
+    try {
+        return wasm.memory_log(this.ptr, ptr0, len0);
+    } finally {
+        wasm.__wbindgen_free(ptr0, len0 * 1);
+    }
 }
 }
 
@@ -310,10 +336,6 @@ export function __wbindgen_string_get(i, len_ptr) {
     const [ptr, len] = passStringToWasm(obj);
     getUint32Memory()[len_ptr / 4] = len;
     return ptr;
-}
-
-export function __wbindgen_cb_forget(i) {
-    dropRef(i);
 }
 
 export function __wbindgen_throw(ptr, len) {

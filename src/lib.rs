@@ -4,7 +4,6 @@ extern crate wasm_bindgen;
 extern crate rand;
 
 use std::fmt;
-
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(module = "./index")]
@@ -44,11 +43,12 @@ extern "C" {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CardState {
-    Opened = 1,
-    Closed = 0
+    Opened,
+    Closed,
+    Matched
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Card {
     pub id: usize,
     pub value: char,
@@ -59,7 +59,8 @@ pub struct Card {
 pub struct Memory {
     cards: Vec<Card>,
     width: u32,
-    height: u32
+    height: u32,
+    score: u8
 }
 
 impl Card {
@@ -67,11 +68,34 @@ impl Card {
         Card {
             id,
             value,
-            state: CardState::Closed
+            state: CardState::Closed,
         }
     }
-}
 
+    pub fn is_matched(&self) -> bool {
+        self.state == CardState::Matched
+    }
+
+    pub fn is_revealed(&self) -> bool {
+        self.state == CardState::Opened
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.state == CardState::Closed
+    }
+
+    pub fn set_matched(&mut self) {
+        self.state = CardState::Matched;
+    }
+
+    pub fn set_revealed(&mut self) {
+        self.state = CardState::Opened;
+    }
+
+    pub fn set_closed(&mut self) {
+        self.state = CardState::Closed;
+    }
+}
 
 #[wasm_bindgen]
 impl Memory {
@@ -85,8 +109,9 @@ impl Memory {
 
         Memory {
             cards,
-            width: 7,
-            height: 4
+            width: 6,
+            height: 4,
+            score: 0
         }
     }
 
@@ -105,26 +130,79 @@ impl Memory {
 
             let card_value = match card.state  {
                 CardState::Opened => card.value.to_string(),
+                CardState::Matched => "✅".to_string(),
                 CardState::Closed => "".to_string()
             };
             card_element.set_inner_html(&card_value);
 
-            let mut card_clone = card.clone();
-            
-            let on_click = Closure::new(move || {
-                card_clone.state = CardState::Opened;
-                log(&card_clone.value.to_string());
-            });
-            card_element.set_onclick(&on_click);
-
-            on_click.forget();
-
             container.append_child(card_element);
         };
+
+        log("Appended card elements to the DOM.")
+    }
+
+    pub fn update(&self) {
+        for (index, card) in self.cards.iter().enumerate() {
+            let card_element = document.get_element_by_id(&index.to_string());
+
+            let card_value = match card.state {
+                CardState::Opened => card.value.to_string(),
+                CardState::Matched => "✅".to_string(),
+                CardState::Closed => "".to_string()
+            };
+
+            card_element.set_inner_html(&card_value);
+        }
     }
 
     pub fn render(&self) -> String {
         self.to_string()
+    }
+
+    pub fn close_cards(&mut self) {
+        self.cards.iter_mut().for_each(|card| {
+            card.set_closed();
+        });
+    }
+
+    pub fn reveal_card(&mut self, card_index: usize) {
+        {
+            let card: &mut Card = self.cards.iter_mut().nth(card_index).unwrap();
+
+            card.set_revealed();
+        }
+
+        self.update();
+
+        self.handle_match();
+
+        self.update();
+    }
+
+    pub fn check_match(&mut self) -> bool {
+        true
+    }
+
+    pub fn handle_match(&mut self) {
+        match self.check_match() {
+            true => self.increase_score(),
+            false => unimplemented!()
+        };
+    }
+
+    pub fn increase_score(&mut self) {
+        self.score += 1;
+
+        log(&self.score.to_string());
+        self.cards
+            .iter_mut()
+            .filter(|card| { card.is_revealed() })
+            .for_each(|card| { card.set_matched() });
+
+    }
+
+    pub fn log(&self, message: &str) {
+        log(&message);
     }
 }
 
@@ -137,6 +215,14 @@ impl fmt::Display for Memory {
             }
             write!(f, "\n")?;
         }
+
+        Ok(())
+    }
+}
+
+impl fmt::Display for Card {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.value)?;
 
         Ok(())
     }
