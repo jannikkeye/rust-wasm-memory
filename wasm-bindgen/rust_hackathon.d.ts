@@ -1,5 +1,6 @@
 /* tslint:disable */
 export class Memory {
+constructor(...args: any[]);
 free(): void;
 static  new(arg0: string): Memory;
 

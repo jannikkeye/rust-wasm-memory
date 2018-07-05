@@ -12,7 +12,7 @@ extern {
 }
 
 #[wasm_bindgen]
-extern {
+extern "C" {
     #[wasm_bindgen(js_name = setTimeout)]
     fn set_timeout(cb: &Closure<FnMut()>, delay: u32) -> f64;
 
@@ -41,7 +41,7 @@ extern {
 }
 
 #[wasm_bindgen]
-extern "C" {
+extern {
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
 }
@@ -71,7 +71,7 @@ pub struct Memory {
     cards: Vec<Card>,
     width: u32,
     height: u32,
-    score: u8,
+    score: u8, 
     container: HTMLElement
 }
 
@@ -111,6 +111,7 @@ impl Card {
 
 #[wasm_bindgen]
 impl Memory {
+    #[wasm_bindgen(constructor)]
     pub fn new(container: &str) -> Memory {
         let mut cards = Vec::new();
         let chars: Vec<char> = get_shuffled_cards().chars().collect();
@@ -164,6 +165,15 @@ impl Memory {
                 CardState::Closed => "".to_string()
             };
             card_element.set_inner_html(&card_value);
+
+            let b = Closure::new(move || {
+                unsafe {
+                    let mut card = *card;
+
+                    card.set_revealed();
+                }
+            });
+            card_element.set_onclick(&b);
 
             cards.append_child(&card_element);
         };

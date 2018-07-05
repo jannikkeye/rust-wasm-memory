@@ -216,16 +216,28 @@ function addBorrowedObject(obj) {
     return ((stack.length - 1) << 1) | 1;
 }
 
+class ConstructorToken {
+    constructor(ptr) {
+        this.ptr = ptr;
+    }
+}
+
 export class Memory {
 
                 static __construct(ptr) {
-                    return new Memory(ptr);
+                    return new Memory(new ConstructorToken(ptr));
                 }
 
-                constructor(ptr) {
-                    this.ptr = ptr;
-                }
+                constructor(...args) {
+                    if (args.length === 1 && args[0] instanceof ConstructorToken) {
+                        this.ptr = args[0].ptr;
+                        return;
+                    }
 
+                    // This invocation of new will call this constructor with a ConstructorToken
+                    let instance = Memory.new(...args);
+                    this.ptr = instance.ptr;
+                }
             free() {
                 const ptr = this.ptr;
                 this.ptr = 0;

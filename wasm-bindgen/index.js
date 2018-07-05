@@ -70,7 +70,7 @@ export function attach_event_listeners(memory) {
 
 
 js.then(js => {
-  const memory = js.Memory.new();
+  const memory = new js.Memory();
   const pre = document.getElementById("memory-canvas");
   
   memory.init("memory-canvas");
